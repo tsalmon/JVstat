@@ -3,17 +3,15 @@ require 'open-uri'
 require 'rexml/document'
 
 LOG = ["app_and_gnw", "FC?4554?"]
-SITE =  "http://ws.jeuxvideo.com/forums/"
+SITE =  "http://ws.jeuxvideo.com/"
 MyFile = File.open("result", "w")
 PSEUDO = {}
-
 RGX_NEXT_PAGE = /0-.*<\/page_suivante>/
 RGX_TOPIC = /1-.*<\/lien_topic>/
 RGX_SUIV = /.*<\/suiv_rapide>/
 RGX_DERNIERE = /.*<\/derniere_page>/
 RGX_CONTENT = "<contenu>.*"
 RGX_PSEUDO = /jv:\/\/profil\/[\w_\[\]\(\)\{\}-]*\.xml/
-
 RGX_T = /<\/lien_topic>/
 RGX_R = /<\/?suiv_rapide>|jv:\/\/forums\//
 RGX_S = /<\/page_suivante>/
@@ -25,16 +23,17 @@ end
 
 #lecture des réponses d'une page de sujet
 def pseudo(show)
+  show = (show.sub /jv:\/\/profil\//, "").to_s
   if(PSEUDO[show] == nil) then
-    PSEUDO[show] = 1
+    PSEUDO[show] = [1,0]
   else
-    PSEUDO[show]+= 1
+    PSEUDO[show][0] += 1
   end
 end
 
 #lecture page par page d'un sujet
 def topic(show)
-  reception = open(SITE + show, :http_basic_authentication => LOG).read()
+  reception = open(SITE + "forums/" + show, :http_basic_authentication => LOG).read()
   suiv = reception.match RGX_SUIV  
   reception.scan(RGX_PSEUDO).each {|p| pseudo(p)}
   
@@ -53,12 +52,34 @@ def page (show)
   if(show == nil or show == "") then
     return
   else
-    reception = open(SITE + show, :http_basic_authentication => LOG).read()
-    suivant = rgx_suppr((reception.match RGX_NEXT_PAGE), RGX_S)
+    reception = open(SITE + "forums/" +  show, :http_basic_authentication => LOG).read()
+     suivant = rgx_suppr((reception.match RGX_NEXT_PAGE), RGX_S)
     topics = reception.scan(RGX_TOPIC).each {|link| topic(rgx_suppr(link,RGX_T))}
     page(suivant)
   end
 end
+
+def profil(show)
+  begin
+    reception = open(SITE + "profil/" + show, :http_basic_authentication => LOG).read()
+    age = (reception.match /.*<\/age>/).to_s
+    PSEUDO[show][1] = (age.match /[0-9]+/).to_s
+  rescue URI::InvalidURIError
+    puts show
+  end
+end
+
+# algo premiere partie: 
+#   creer repertoire du forum
+#   pour toutes les 25 pages de forums:
+#      ouvrir topic
+#      pour chaque page du topic:
+#          recuperer pseudo
 page("0-292-0-1-0-1-0-0.xml")
-PSEUDO.each {|key, value| MyFile.write((key.sub /jv:\/\/profil\//, "").to_s + " " + value.to_s + "\n") }
+# algo deuxieme partie:
+#   pour chaque profil:
+#      recuperer age
+PSEUDO.each{ |key, value| profil(key)}
+PSEUDO.each {|key, value| MyFile.write(key + " " + value[1].to_s + " " + value[0].to_s + "\n") }
 MyFile.close
+profil("desir_noir.xml")
