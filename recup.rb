@@ -4,7 +4,6 @@ require 'rexml/document'
 
 LOG = ["app_and_gnw", "FC?4554?"]
 SITE =  "http://ws.jeuxvideo.com/"
-MyFile = File.open("result", "w")
 PSEUDO = {}
 RGX_NEXT_PAGE = /0-.*<\/page_suivante>/
 RGX_TOPIC = /1-.*<\/lien_topic>/
@@ -55,7 +54,6 @@ def page (show)
     reception = open(SITE + "forums/" +  show, :http_basic_authentication => LOG).read()
      suivant = rgx_suppr((reception.match RGX_NEXT_PAGE), RGX_S)
     topics = reception.scan(RGX_TOPIC).each {|link| topic(rgx_suppr(link,RGX_T))}
-    page(suivant)
   end
 end
 
@@ -65,21 +63,31 @@ def profil(show)
     age = (reception.match /.*<\/age>/).to_s
     PSEUDO[show][1] = (age.match /[0-9]+/).to_s
   rescue URI::InvalidURIError
-    puts show
+    puts "\""+show + "\" n'a pas pu etre identifié" 
   end
 end
 
-# algo premiere partie: 
-#   creer repertoire du forum
-#   pour toutes les 25 pages de forums:
-#      ouvrir topic
-#      pour chaque page du topic:
-#          recuperer pseudo
-page("0-292-0-1-0-1-0-0.xml")
-# algo deuxieme partie:
-#   pour chaque profil:
-#      recuperer age
-PSEUDO.each{ |key, value| profil(key)}
-PSEUDO.each {|key, value| MyFile.write(key + " " + value[1].to_s + " " + value[0].to_s + "\n") }
-MyFile.close
-profil("desir_noir.xml")
+def forum_jeu()
+  nom = ""
+  ARGV.each {|arg| nom+="-"+arg}
+  reception = open(SITE + "search_forums_sug/" + nom[1..-1], :http_basic_authentication => LOG).read()
+  page("0-"+(reception.match /[0-9]+<\/id>/).to_s[0..-6]+"-0-1-0-1-0-0.xml")
+  puts PSEUDO
+end
+
+if __FILE__ == $0
+  MyFile = File.open("result", "w")
+  # algo premiere partie: 
+  #   on va sur le forum
+  #   pour toutes les 25 topics de forums:
+  #      ouvrir topic
+  #      pour chaque page du topic:
+  #          recuperer infos
+  forum_jeu()
+  # algo deuxieme partie:
+  #   pour chaque profil:
+  #      recuperer age
+  PSEUDO.each{ |key, value| profil(key)}
+  PSEUDO.each {|key, value| MyFile.write(key + " " + value[1].to_s + " " + value[0].to_s + "\n") }
+  MyFile.close
+  end
