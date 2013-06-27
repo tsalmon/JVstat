@@ -11,10 +11,6 @@ RGX_SUIV = /.*<\/suiv_rapide>/
 RGX_DERNIERE = /.*<\/derniere_page>/
 RGX_CONTENT = "<contenu>.*"
 RGX_PSEUDO = /jv:\/\/profil\/[\w_\[\]\(\)\{\}-]*\.xml/
-RGX_T = /<\/lien_topic>/
-RGX_R = /<\/?suiv_rapide>|jv:\/\/forums\//
-RGX_S = /<\/page_suivante>/
-RGX_D = /<\/?derniere_page>|jv:\/\/forums\//
 
 def rgx_suppr(x, y)
   return x.to_s.sub y, ""
@@ -22,7 +18,6 @@ end
 
 #lecture des réponses d'une page de sujet
 def pseudo(show)
-  show = (show.sub /jv:\/\/profil\//, "").to_s
   if(PSEUDO[show] == nil) then
     PSEUDO[show] = [1,0]
   else
@@ -33,28 +28,27 @@ end
 #lecture page par page d'un sujet
 def topic(show)
   reception = open(SITE + "forums/" + show, :http_basic_authentication => LOG).read()
-  suiv = reception.match RGX_SUIV  
-  reception.scan(RGX_PSEUDO).each {|p| pseudo(p)}
-  return
-  if(suiv.to_s == "<suiv_rapide><\/suiv_rapide>") then
-    dernier = reception.match RGX_DERNIERE
-    if(dernier.to_s != "<derniere_page><\/derniere_page>") then # nb pages = 2
-      topic(dernier.to_s.gsub RGX_D, "")
+  suiv = (reception.match RGX_SUIV).to_s
+  reception.scan(RGX_PSEUDO).each {|p| pseudo(p[12..-1])}
+  if(suiv == "<suiv_rapide><\/suiv_rapide>") then
+    dernier = (reception.match RGX_DERNIERE).to_s
+    if(dernier != "<derniere_page><\/derniere_page>") then # nb pages = 2
+      topic(dernier[27..-17])
     end
   else # nb pages > 2
-    topic(suiv.to_s.gsub RGX_R, "")
+    topic(suiv[25..-15])
   end
 end
 
 #lecture page par page de la liste des sujets
 def page (show)
-  if(show == nil or show == "") then
+  if(show == "") then
     return
   else
     reception = open(SITE + "forums/" +  show, :http_basic_authentication => LOG).read()
-    suivant = rgx_suppr((reception.match RGX_NEXT_PAGE), RGX_S)
-    topics = reception.scan(RGX_TOPIC).each {|link| topic(rgx_suppr(link,RGX_T))}
-    #page("/forums" + suivant)
+    suivant = (reception.match RGX_NEXT_PAGE).to_s[0..-17]
+    topics = reception.scan(RGX_TOPIC).each {|link| topic(link[0..-14])}
+    page(suivant)
   end
 end
 
