@@ -8,12 +8,9 @@ SITE =  "http://ws.jeuxvideo.com/"
 PSEUDO = {}
 RGX_NEXT_PAGE = /0-.*<\/page_suivante>/
 RGX_TOPIC = /1-.*<\/lien_topic>/
-RGX_SUIV = /.*<\/suiv_rapide>/
-RGX_DERNIERE = /.*<\/derniere_page>/
 RGX_CONTENT = "<contenu>.*"
 RGX_PSEUDO = /jv:\/\/profil\/[\w_\[\]\(\)\{\}-]*\.xml/
 
-#lecture des réponses d'une page de sujet
 def pseudo(show)
   if(PSEUDO[show] == nil) then
     PSEUDO[show] = [1,0]
@@ -32,8 +29,8 @@ end
 #lecture page par page d'un sujet
 def topic(show)
   reception = open(SITE + "forums/" + show, CO => LOG).read()
-  suivant = (reception.match RGX_SUIV).to_s
-  dernier = (reception.match RGX_DERNIERE).to_s
+  suivant = (reception.match /.*<\/suiv_rapide>/).to_s
+  dernier = (reception.match /.*<\/derniere_page>/).to_s
   reception.scan(RGX_PSEUDO).each {|p| pseudo(p[12..-1])}
   topic_suivant(suivant, dernier)
 end
@@ -48,7 +45,7 @@ def page (show)
 end
 
 def profil(show)
-  s =  (show.sub /\]/, "%5D").to_s.sub /\[/, "%5B"
+  s = (show.sub /\]/, "%5D").to_s.sub /\[/, "%5B"
   reception = open(SITE + "profil/" + s, CO => LOG).read()
   age = (reception.match /.*<\/age>/).to_s
   PSEUDO[show][1] = (age.match /[0-9]+/).to_s
@@ -59,6 +56,23 @@ def forum_jeu()
   ARGV.each {|arg| nom+="-"+arg}
   reception = open(nom, CO => LOG).read()
   page("0-"+(reception.match /[0-9]+<\/id>/).to_s[0..-6]+"-0-1-0-1-0-0.xml")
+  return enregistre(nom[43..-1])
+end
+
+def ecriture(mb)
+  PSEUDO.each{ |key, value| profil(key)} # part. 2
+  PSEUDO.each do |key, value| 
+    mb.write(key + " " + value[1].to_s + " " + value[0].to_s + "\n")
+  end
+  mb.close
+end
+
+def enregistre(nom_jeu)
+  if(false == (File.directory? "JV_" + nom_jeu)) then
+    Dir.mkdir("JV_" + nom_jeu)
+  end
+  mb = File.open("JV_" + nom_jeu + "/" + "membres.info", "w")
+  ecriture(mb)
 end
 
 # algo premiere partie: 
@@ -72,9 +86,5 @@ end
 #   pour chaque profil:
 #      recuperer age
 if __FILE__ == $0
-  MyFile = File.open("result", "w")
   forum_jeu() # part. 1
-  PSEUDO.each{ |key, value| profil(key)} # part. 2
-  PSEUDO.each {|key, value| MyFile.write(key + " " + value[1].to_s + " " + value[0].to_s + "\n") }
-  MyFile.close
 end
