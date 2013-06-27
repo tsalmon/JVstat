@@ -35,7 +35,7 @@ def topic(show)
   reception = open(SITE + "forums/" + show, :http_basic_authentication => LOG).read()
   suiv = reception.match RGX_SUIV  
   reception.scan(RGX_PSEUDO).each {|p| pseudo(p)}
-  
+  return
   if(suiv.to_s == "<suiv_rapide><\/suiv_rapide>") then
     dernier = reception.match RGX_DERNIERE
     if(dernier.to_s != "<derniere_page><\/derniere_page>") then # nb pages = 2
@@ -52,14 +52,16 @@ def page (show)
     return
   else
     reception = open(SITE + "forums/" +  show, :http_basic_authentication => LOG).read()
-     suivant = rgx_suppr((reception.match RGX_NEXT_PAGE), RGX_S)
+    suivant = rgx_suppr((reception.match RGX_NEXT_PAGE), RGX_S)
     topics = reception.scan(RGX_TOPIC).each {|link| topic(rgx_suppr(link,RGX_T))}
+    #page("/forums" + suivant)
   end
 end
 
 def profil(show)
+  s =  (show.sub /\]/, "%5D").to_s.sub /\[/, "%5B"
   begin
-    reception = open(SITE + "profil/" + show, :http_basic_authentication => LOG).read()
+    reception = open(SITE + "profil/" + s, :http_basic_authentication => LOG).read()
     age = (reception.match /.*<\/age>/).to_s
     PSEUDO[show][1] = (age.match /[0-9]+/).to_s
   rescue URI::InvalidURIError
@@ -72,7 +74,6 @@ def forum_jeu()
   ARGV.each {|arg| nom+="-"+arg}
   reception = open(SITE + "search_forums_sug/" + nom[1..-1], :http_basic_authentication => LOG).read()
   page("0-"+(reception.match /[0-9]+<\/id>/).to_s[0..-6]+"-0-1-0-1-0-0.xml")
-  puts PSEUDO
 end
 
 if __FILE__ == $0
@@ -91,3 +92,4 @@ if __FILE__ == $0
   PSEUDO.each {|key, value| MyFile.write(key + " " + value[1].to_s + " " + value[0].to_s + "\n") }
   MyFile.close
   end
+                 
